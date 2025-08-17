@@ -1,0 +1,6 @@
+pyproject.toml
+visionlanguagemodel.egg-info/PKG-INFO
+visionlanguagemodel.egg-info/SOURCES.txt
+visionlanguagemodel.egg-info/dependency_links.txt
+visionlanguagemodel.egg-info/requires.txt
+visionlanguagemodel.egg-info/top_level.txt
