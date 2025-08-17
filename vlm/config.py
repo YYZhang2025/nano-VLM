@@ -16,7 +16,10 @@ class ModelConfig:
     vit_ln_eps: float = 1e-6
     # Language Model Configuration
 
+    lm_hidden_dim: int = 768
+
     # Multi-Modality Model Configuration
+    mp_pixel_shuffle_factor: int = 2
 
     def merge_from_hf_vision(self, hf_config):
         """
