@@ -1,6 +1,9 @@
 pyproject.toml
+test/test_vision_model.py
 visionlanguagemodel.egg-info/PKG-INFO
 visionlanguagemodel.egg-info/SOURCES.txt
 visionlanguagemodel.egg-info/dependency_links.txt
 visionlanguagemodel.egg-info/requires.txt
 visionlanguagemodel.egg-info/top_level.txt
+vlm/config.py
+vlm/model/vision_model.py

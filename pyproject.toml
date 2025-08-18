@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "datasets>=4.0.0",
+    "dotenv>=0.9.9",
     "einops>=0.8.1",
     "huggingface-hub>=0.34.2",
     "numpy<3",
@@ -16,4 +17,4 @@ dependencies = [
 
 
 [tool.setuptools.packages.find]
-include = ["vlm"]
+include = ["vlm*"]
