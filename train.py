@@ -220,7 +220,7 @@ def train(train_config: TrainConfig, model_config: ModelConfig):
     optimizer = optim.AdamW(params_groups)
     all_params = [p for group in optimizer.param_groups for p in group["params"]]
 
-    device = get_device()
+    device = get_device(get_rank())
     if device.type == "mps":
         torch.backends.mps.enable_fallback_to_cpu = True
         torch.mps.empty_cache()
@@ -280,7 +280,7 @@ def train(train_config: TrainConfig, model_config: ModelConfig):
                 dtype=torch.bfloat16 if device.type in ["cuda", "cpu"] else torch.float16,
             )
             with autocast_context, context:
-                outputs, loss = model(
+                _, loss = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                     images=images,
@@ -582,17 +582,6 @@ def main():
         # Access values
         api_key = os.getenv("WANDB_API_KEY")
         wandb.login(key=api_key)
-
-    # --- Distributed init ---
-    # If user wants CPU DDP, set safe env hints and force Gloo backend before init.
-    if args.dist_cpu:
-        # Make sure CUDA isn't used by accident
-        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
-        # Helpful NCCL disables in case the backend choice leaks somewhere
-        os.environ.setdefault("NCCL_P2P_DISABLE", "1")
-        os.environ.setdefault("NCCL_IB_DISABLE", "1")
-        # Hint a backend for any helper that inspects this
-        os.environ.setdefault("TORCH_DISTRIBUTED_BACKEND", "gloo")
 
     # Initialize distributed if launched with torchrun (envs provided by torchrun)
     if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
