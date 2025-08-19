@@ -1,14 +1,19 @@
+import os
+
 import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 
 
 def init_dist():
+    rank = int(os.environ["RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
+    local_rank = int(os.environ["LOCAL_RANK"])
+
     backend = "nccl" if torch.cuda.is_available() else "gloo"
-    dist.init_process_group(backend=backend)
+    dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
     if backend == "nccl":
-        torch.cuda.set_device(dist.get_rank())
-    torch.cuda.set_device(dist.get_rank())
+        torch.cuda.set_device(local_rank)
 
 
 def destroy_dist():
@@ -28,7 +33,8 @@ def get_world_size():
 
 
 def get_rank():
-    return dist.get_rank() if is_dist() else 0
+    rank = int(os.environ.get("RANK", 0))
+    return rank if is_dist() else 0
 
 
 def dist_gather(o):

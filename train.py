@@ -38,7 +38,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 PIL.PngImagePlugin.MAX_TEXT_CHUNK = 100 * 1024 * 1024
 
 
-def get_dataloader(train_config: TrainConfig, model_config: ModelConfig):
+def get_dataloader(train_config: TrainConfig, model_config: ModelConfig) -> tuple[DataLoader, DataLoader]:
     image_processor = get_image_processor(model_config.max_img_size, model_config.vit_img_size)
     tokenizer = get_tokenizer(
         model_config.lm_tokenizer, model_config.vlm_extra_tokens, model_config.lm_chat_template
@@ -71,8 +71,9 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig):
         seed=0
     )  # Shuffle the training dataset, so train and val get equal contributions from all concatenated datasets
 
-    if is_dist():  # We need to shard the dataset in DDP since we are using an iterable dataset instead of the distributed sampler
-        train_ds = train_ds.shard(num_shards=get_world_size(), index=get_rank())
+    # if is_dist():
+    #     # This will return a non-overlapping slice of dataset
+    #     train_ds = train_ds.shard(num_shards=get_world_size(), index=get_rank())
 
     # Apply cutoff if specified
     if train_config.data_cutoff_idx is None:
@@ -86,7 +87,6 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig):
     train_dataset = VQADataset(
         train_ds.select(range(train_size)), tokenizer, image_processor, model_config.mp_image_token_length
     )
-
     train_dataset = ConstantLengthDataset(
         train_dataset,
         infinite=False,
@@ -97,6 +97,17 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig):
         max_images_per_example=train_config.max_images_per_example,
         max_images_per_knapsack=train_config.max_images_per_knapsack,
     )
+    # Samplers
+    train_sampler = None
+    if is_dist():
+        train_sampler = DistributedSampler(
+            train_dataset,
+            rank=get_rank(),
+            num_replicas=get_world_size(),
+            shuffle=True,
+            drop_last=True,
+        )
+
     val_dataset = VQADataset(
         train_ds.select(range(train_size, total_samples)),
         tokenizer,
@@ -114,12 +125,14 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig):
     train_loader = DataLoader(
         train_dataset,
         batch_size=train_config.batch_size,  # =per device BS in DDP
+        sampler=train_sampler,
         collate_fn=vqa_collator,
         num_workers=8,
         pin_memory=torch.cuda.is_available(),
         drop_last=True,
         worker_init_fn=seed_worker,
         generator=g,
+        persistent_workers=False,
     )
 
     val_sampler = DistributedSampler(
@@ -228,6 +241,7 @@ def train(train_config: TrainConfig, model_config: ModelConfig):
     model.to(device)
     if train_config.compile:
         model = torch.compile(model)
+
     if is_dist():
         model = wrap_model(model)
 
@@ -248,13 +262,26 @@ def train(train_config: TrainConfig, model_config: ModelConfig):
         epoch += 1
         epoch_start_time = time.time()
         model.train()
+        # Ensure samplers are in sync across ranks for this epoch
+        if is_dist():
+            if isinstance(train_loader.sampler, DistributedSampler):
+                train_loader.sampler.set_epoch(epoch)
+            if isinstance(val_loader.sampler, DistributedSampler):
+                val_loader.sampler.set_epoch(epoch)
+
+        if is_master():
+            print(
+                f"Epoch {epoch} starting; train iters per rank: {len(train_loader)}; val iters per rank: {len(val_loader)}",
+                flush=True,
+            )
 
         total_train_loss = 0
         total_tokens_processed = 0
         optimizer.zero_grad()
         data_load_start = time.time()
 
-        for i, batch in enumerate(synchronized_dataloader_step(train_loader, is_dist())):
+        # for i, batch in enumerate(synchronized_dataloader_step(train_loader, is_dist())):
+        for i, batch in enumerate(train_loader):
             is_update_step = (i + 1) % train_config.gradient_accumulation_steps == 0 or i + 1 == len(
                 train_loader
             )
@@ -534,8 +561,8 @@ def get_args():
     parser.add_argument(
         "--vlm_checkpoint_path", type=str, help="Path to the VLM checkpoint for loading or saving"
     )
-    parser.add_argument("--compile", type=bool, help="Use torch.compile to optimize the model")
-    parser.add_argument("--log_wandb", type=bool, help="Log to wandb")
+    parser.add_argument("--compile", action="store_true", help="Use torch.compile to optimize the model")
+    parser.add_argument("--log_wandb", action="store_true", help="Log to wandb")
     parser.add_argument(
         "--resume_from_vlm_checkpoint",
         type=bool,
