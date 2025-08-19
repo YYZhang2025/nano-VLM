@@ -253,8 +253,6 @@ def train(train_config: TrainConfig, model_config: ModelConfig):
         model.train()
         # Ensure samplers are in sync across ranks for this epoch
         if is_dist():
-            if isinstance(train_loader.sampler, DistributedSampler):
-                train_loader.sampler.set_epoch(epoch)
             if isinstance(val_loader.sampler, DistributedSampler):
                 val_loader.sampler.set_epoch(epoch)
 
@@ -271,6 +269,8 @@ def train(train_config: TrainConfig, model_config: ModelConfig):
 
         # for i, batch in enumerate(synchronized_dataloader_step(train_loader, is_dist())):
         for i, batch in enumerate(train_loader):
+            if is_master():
+                print("Step: ", i)
             is_update_step = (i + 1) % train_config.gradient_accumulation_steps == 0 or i + 1 == len(
                 train_loader
             )

@@ -40,7 +40,7 @@ class RotaryEmbedding(nn.Module):
     def forward(self, position_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         B, S = position_ids.size()
 
-        max_seq = position_ids.max().item() + 1
+        max_seq = position_ids.max() + 1
         if max_seq > self.original_max_seq_len:
             scale = max_seq / self.original_max_seq_len
             inv_freq = self.inv_freq / scale
