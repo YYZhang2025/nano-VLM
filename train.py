@@ -111,7 +111,6 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig):
     g.manual_seed(0)
 
     # Create dataloaders
-
     train_loader = DataLoader(
         train_dataset,
         batch_size=train_config.batch_size,  # =per device BS in DDP
@@ -600,6 +599,8 @@ def main():
         init_dist()
 
     if is_master():
+        print(os.environ.get("RANK", "0"))
+        print(os.environ.get("WORLD_SIZE", "1"))
         print("--- VLM Config ---")
         print(model_config)
         print("--- Train Config ---")
