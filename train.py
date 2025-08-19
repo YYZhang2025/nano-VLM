@@ -71,9 +71,9 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig) -> tupl
         seed=0
     )  # Shuffle the training dataset, so train and val get equal contributions from all concatenated datasets
 
-    # if is_dist():
-    #     # This will return a non-overlapping slice of dataset
-    #     train_ds = train_ds.shard(num_shards=get_world_size(), index=get_rank())
+    if is_dist():
+        # This will return a non-overlapping slice of dataset
+        train_ds = train_ds.shard(num_shards=get_world_size(), index=get_rank())
 
     # Apply cutoff if specified
     if train_config.data_cutoff_idx is None:
@@ -97,16 +97,6 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig) -> tupl
         max_images_per_example=train_config.max_images_per_example,
         max_images_per_knapsack=train_config.max_images_per_knapsack,
     )
-    # Samplers
-    train_sampler = None
-    if is_dist():
-        train_sampler = DistributedSampler(
-            train_dataset,
-            rank=get_rank(),
-            num_replicas=get_world_size(),
-            shuffle=True,
-            drop_last=True,
-        )
 
     val_dataset = VQADataset(
         train_ds.select(range(train_size, total_samples)),
@@ -125,7 +115,6 @@ def get_dataloader(train_config: TrainConfig, model_config: ModelConfig) -> tupl
     train_loader = DataLoader(
         train_dataset,
         batch_size=train_config.batch_size,  # =per device BS in DDP
-        sampler=train_sampler,
         collate_fn=vqa_collator,
         num_workers=8,
         pin_memory=torch.cuda.is_available(),
@@ -615,8 +604,6 @@ def main():
         init_dist()
 
     if is_master():
-        print(os.environ.get("RANK", "0"))
-        print(os.environ.get("WORLD_SIZE", "1"))
         print("--- VLM Config ---")
         print(model_config)
         print("--- Train Config ---")

@@ -17,7 +17,9 @@ class ModelConfig:
     vit_ln_eps: float = 1e-6
 
     # Language Model Configuration
-    lm_vocab_size: int = 100
+    lm_base_vocab_size: int = 49152
+    lm_extra_token_amount: int = 17
+    lm_vocab_size: int = lm_base_vocab_size + lm_extra_token_amount
 
     lm_hidden_dim: int = 768
     lm_inter_dim: int = 3072
@@ -80,6 +82,8 @@ class ModelConfig:
             "Language model number of heads must be divisible by number of KV heads."
         )
 
+        self.lm_extra_token_amount = len(self.vlm_extra_tokens) if self.vlm_extra_tokens is not None else 0
+
     def merge_from_hf_vision(self, hf_config):
         """
         Merge fields from a Hugging Face vision config (e.g., SiglipVisionConfig)
@@ -111,9 +115,11 @@ class ModelConfig:
         self.lm_max_position_embeddings = getattr(
             hf_config, "max_position_embeddings", self.lm_max_position_embeddings
         )
-        self.lm_vocab_size = getattr(hf_config, "vocab_size", self.lm_vocab_size)
+        self.lm_base_vocab_size = getattr(hf_config, "vocab_size", self.lm_base_vocab_size)
         self.lm_dropout = getattr(hf_config, "attention_dropout", self.lm_dropout)
         self.lm_n_blocks = getattr(hf_config, "num_hidden_layers", self.lm_n_blocks)
+
+        self.lm_vocab_size = self.lm_base_vocab_size + self.lm_extra_token_amount
         return self
 
 
