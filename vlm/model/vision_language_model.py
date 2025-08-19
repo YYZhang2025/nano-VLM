@@ -1,7 +1,5 @@
 import json
 import os
-import tempfile
-from dataclasses import asdict
 from typing import Optional
 
 import torch
@@ -24,8 +22,8 @@ class VisionLanguageModel(nn.Module):
 
         self.config = config
         if load_backbone:
-            self.vision_encoder = ViT(config)
-            self.decoder = LanguageModel(config)
+            self.vision_encoder = ViT.from_pretrained(config)
+            self.decoder = LanguageModel.from_pretrained(config)
         else:
             self.vision_encoder = ViT(config)
             self.decoder = LanguageModel(config)
@@ -39,6 +37,7 @@ class VisionLanguageModel(nn.Module):
         updated_token_embd = token_embd.clone()
 
         mask = input_ids == self.tokenizer.image_token_id
+        print(self.tokenizer.image_token_id)
         updated_token_embd[mask] = image_embd.view(-1, image_embd.size(-1)).to(updated_token_embd.dtype)
 
         return updated_token_embd
